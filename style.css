@@ -1,0 +1,94 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter');
+
+
+/* Body */
+body {
+    background-color: #a7bcff;
+    font-family: "Inter", sans-serif;
+}
+
+/* Form Container */
+.form-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 90vh;
+}
+
+
+/* Form Wrapper */
+.form-wrapper {
+    display: flex;
+    background-color: white;
+    padding: 40px 80px 5px 80px;
+    border-radius: 10px;
+    flex-direction: column;
+    gap: 15px;
+    align-items: center;
+
+}
+
+.form-wrapper form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.form-wrapper input {
+    padding: 15px;
+    width: 250px;
+    border: none;
+    border-bottom: 1px solid #a7bcff;
+}
+
+.form-wrapper #file {
+    display: none;
+}
+
+.form-wrapper input::placeholder {
+    color: rgb(170, 170, 170);
+}
+
+.form-wrapper button {
+    background-color: #7b96ec;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+    font-family: "Inter Medium";
+    cursor: pointer;
+    
+}
+
+.form-wrapper label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #8da4f1;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.form-wrapper label img {
+    width: 32px
+}
+
+
+.form-wrapper p {
+    font-size: 12px;
+}
+
+
+/* Logo */
+.logo {
+    color: #5d5b8d;
+    font-weight: bold;
+    font-size: 32px;
+}
+
+/* Title */
+.title {
+    color: #5d5b8d;
+    font-size: 14px;
+}
+
