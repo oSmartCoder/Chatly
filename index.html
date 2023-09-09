@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chatly</title>
     <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
 </head>
 <body>
     <div class="form-container">
@@ -14,15 +15,15 @@
             <span class="title">Register</span>
     
             <form>
-                <input type="text" placeholder="Display name" required>
-                <input type="email" placeholder="Email" required>
-                <input type="password" placeholder="Password" required>
-                <input type="file" id="file" required>
-                <label htmlFor="file">
+                <input type="text" id="text" placeholder="Username" maxlength="16" required>
+                <input type="email" id="email" placeholder="Email" required>
+                <input type="password" id="password" placeholder="Password" required>
+                <input type="file" id="file" accept="image/*,.png,.jpg,.jpeg" required>
+                <label for="file">
                     <img src="./images/add_avatar.png" alt="Add Image">
                     <span>Add avatar</span>
                 </label>
-                <button type="submit">Sign up</button>
+                <button type="submit" id="submit">Sign up</button>
             </form>
             <p>Have an account? <span><a href="login.html">Login here</a></span></p>
 
