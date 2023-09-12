@@ -15,7 +15,6 @@ body {
     height: 90vh;
 }
 
-
 /* Form Wrapper */
 .form-wrapper {
     display: flex;
@@ -95,3 +94,22 @@ body {
     font-size: 14px;
 }
 
+.home {
+    background-color: #a7bcff;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.home .container {
+    display: flex;
+}
+
+.container .sidebar {
+
+}
+
+.container .chat {
+    
+}
