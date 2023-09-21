@@ -9,4 +9,3 @@ submit.addEventListener("click", () => {
     window.location.replace('home.html')
 
 })
-
