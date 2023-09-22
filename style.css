@@ -5,6 +5,7 @@
 body {
     background-color: #a7bcff;
     font-family: "Inter", sans-serif;
+    margin: 0;
 }
 
 /* Form Container */
@@ -98,18 +99,25 @@ body {
     background-color: #a7bcff;
     height: 100vh;
     display: flex;
-    align-items: center;
-    justify-content: center;
+
 }
 
 .home .container {
     display: flex;
+    width: 100%;
+    height: 100%;
+    
+
+
 }
 
-.container .sidebar {
+.sidebar {
+    flex: 1;
+    background-color: #3e3c61;
 
 }
 
-.container .chat {
+.chat {
+    flex: 2;
     
 }
