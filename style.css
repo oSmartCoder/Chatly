@@ -1,6 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter');
 
-
 /* Body */
 body {
     background-color: #a7bcff;
@@ -308,7 +307,6 @@ body {
 
 
 
-
 .chat-input {
     height: 50px;
     background-color: white;
@@ -353,7 +351,6 @@ body {
     cursor: pointer;
 
 }
-
 
 .send input {
     display: none;
