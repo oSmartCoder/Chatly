@@ -27,40 +27,45 @@ registerForm.addEventListener("submit", async (e) => {
 	const password = e.target[2].value
 	const file = e.target[3].files[0]
 
-	createUserWithEmailAndPassword(auth, email, password)
-	.then((userCredential) => {
-	const user = userCredential.user;
+	try {
+		// Create user
+		const res = await createUserWithEmailAndPassword(auth, email, password)
+		const storageRef = ref(storage, displayName)
 
-	const storageRef = ref(storage, displayName)
-	const uploadTask = uploadBytesResumable(storageRef, file)
 
-	uploadTask.on('state_changed', 
-		(error) => {setError(registerForm, 'errorSpan')}, 
-		() => {
-		getDownloadURL(uploadTask.snapshot.ref)
-		.then(async (downloadURL) => {
+		const uploadTask = uploadBytesResumable(storageRef, file)
 
-			await updateProfile(user, {
-                displayName,
-                photoURL: downloadURL,
-			})
-			
-            await setDoc(doc(db, 'users', user.uid)), {
-                uid: user.uid,
-                displayName,
-                email,
-                photoURL: downloadURL
+		uploadTask.on(
+			(error) => {
+				console.log(error)
+				setError(registerForm, 'errorSpan')
+			},
+			() => {
+				getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
+					// Update profile
+					await updateProfile(res.user, {
+						displayName,
+						photoURL: downloadURL,
+					})
+	
+					// Create user on firestore
+					await setDoc(doc(db, 'users', res.user.uid), {
+						uid: res.user.uid,
+						displayName,
+						email,
+						photoURL: downloadURL,
+					})
+
+					// Create user chats on firestore
+					await setDoc(doc(db, 'userChats', res.user.uid), {})
+
+					
+				})
 			}
-		})
-        }
-	)
-
-
-	})
-	.catch((error) => {
-	// const errorCode = error.code;
-	// const errorMessage = error.message;
-	setError(registerForm, 'errorSpan')
-	})
+		)
+	}
+	catch (error) {
+		console.log(error)
+		setError(registerForm, 'errorSpan')
+	}
 })
-
