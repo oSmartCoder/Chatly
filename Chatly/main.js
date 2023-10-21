@@ -7,6 +7,8 @@ import { onAuthStateChanged } from 'firebase/auth'
 
 const content = document.getElementById('content')
 
+var userSignedIn
+
 const setError = (parentElement, id) => {
 	if (parentElement.contains(document.getElementById(id))) {
 		return
@@ -30,100 +32,137 @@ let loadHTML = (url, callback) => {
   xhr.send()
 }
 
-let updateContent = (route) => {
-	content.innerHTML = ''
+let updateUserStatus = new Promise((resolve, reject) => {
+	onAuthStateChanged(auth, (user) => {
+		
+		userSignedIn = !!user
+		console.log(userSignedIn)
+	})
+	resolve()
+})
 
-	switch (route) {
-		case '/':
-			loadHTML('home.html', (html) => {
-				content.innerHTML = html
-			})
-			break
-		case '/login':
-			loadHTML('login.html', (html) => {
-				content.innerHTML = html
-			})
-			break
-		case '/register':
-			loadHTML('register.html', (html) => {
-				content.innerHTML = html
-			})
-			break
-		default:
-			content.innerHTML = '404 Page not found'
-	}
+
+let updateContent = (route) => {
+	return new Promise(async (resolve, reject) => {
+		content.innerHTML = ''
+		updateUserStatus.then(() => {
+			switch (route) {
+				case '/':
+					loadHTML(`${(userSignedIn) ? 'home' : 'login'}.html`, (html) => {
+						content.innerHTML = html
+						resolve()
+					})
+					break
+	
+				case '/login':
+					loadHTML(`${(userSignedIn) ? 'home' : 'login'}.html`, (html) => {
+						content.innerHTML = html
+						resolve()
+					})
+					break
+	
+				case '/register':
+					loadHTML(`${(userSignedIn) ? 'home' : 'register'}.html`, (html) => {
+						content.innerHTML = html
+						resolve()
+					})
+					break
+	
+				default:
+					content.innerHTML = '404 Page not found'
+					reject('404 Page not found')
+			}
+
+		})
+		console.log(userSignedIn, 'ee')
+	})
 }
 
 let handleNavigation = () => {
-	const route = window.location.pathname
-	updateContent(route)
+	return new Promise(async resolve => {
+		const route = window.location.pathname
+		await updateContent(route)
+		resolve()
+	})
 }	
 
 // Add event listeners
 window.addEventListener('popstate', handleNavigation)
 
-// Initial page load
-handleNavigation()
 
-console.log(document)
-let registerForm = document.getElementById('register-form')
 
-registerForm.addEventListener("submit", async (e) => {
-	e.preventDefault(e)
-	const displayName = e.target[0].value
-	const email = e.target[1].value
-	const password = e.target[2].value
-	const file = e.target[3].files[0]
+;(async () => {
+	// Initial page load
+	await handleNavigation()
 
-	try {
-		// Create user AUTHENTICATION
-		const res = await createUserWithEmailAndPassword(auth, email, password)
+	let registerForm = document.getElementById('register-form')
 
-		// Create storange reference
-		const storageRef = ref(storage, displayName)
+	registerForm.addEventListener("submit", async (e) => {
+		e.preventDefault(e)
+		const displayName = e.target[0].value
+		const email = e.target[1].value
+		const password = e.target[2].value
+		const file = e.target[3].files[0]
 
-		// STORAGE
-		const uploadTask = uploadBytesResumable(storageRef, file)
+		try {
+			// Create user AUTHENTICATION
+			const res = await createUserWithEmailAndPassword(auth, email, password)
 
-		uploadTask.on('state_changed',
-			(snapshot) => {
-				// Handle the upload progress
-				const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-				console.log(`Upload is ${progress}% complete`)
-			},
+			// Create storange reference
+			const storageRef = ref(storage, displayName)
 
-			(error) => {
-				console.log('Upload error:', error)
-				setError(registerForm, 'errorSpan')
-			},
-			
-			() => {
-				getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
-					// Update profile
-					await updateProfile(res.user, {
-						displayName,
-						photoURL: downloadURL,
+			// STORAGE
+			const uploadTask = uploadBytesResumable(storageRef, file)
+
+			uploadTask.on('state_changed',
+				(snapshot) => {
+					// Handle the upload progress
+					const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+					console.log(`Upload is ${progress}% complete`)
+				},
+
+				(error) => {
+					console.log('Upload error:', error)
+					setError(registerForm, 'errorSpan')
+				},
+				
+				() => {
+					getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
+						// Update profile
+						await updateProfile(res.user, {
+							displayName,
+							photoURL: downloadURL,
+						})
+		
+						// Create user on firestore
+						await setDoc(doc(db, 'users', res.user.uid), {
+							uid: res.user.uid,
+							displayName,
+							email,
+							photoURL: downloadURL,
+						})
+
+						// Create user chats on firestore
+						await setDoc(doc(db, 'userChats', res.user.uid), {})
+
+						// This code runs INSIDE of the asynchronous function (so that the page won't refresh mid-upload)
+						await updateContent('/')
+
+						userSignedIn = true
 					})
+				}
+			)
+		}
+		catch (error) {
+			console.log(error)
+			setError(registerForm, 'errorSpan')
+		}
+	})
+
 	
-					// Create user on firestore
-					await setDoc(doc(db, 'users', res.user.uid), {
-						uid: res.user.uid,
-						displayName,
-						email,
-						photoURL: downloadURL,
-					})
+})()
 
-					// Create user chats on firestore
-					await setDoc(doc(db, 'userChats', res.user.uid), {})
 
-					// This code runs INSIDE of the asynchronous function (so that the page won't refresh mid-upload)
-					window.location.replace('home.html')
-				})
-			}
-		)
-	}
-	catch (error) {
-		console.log(error)
-		setError(registerForm, 'errorSpan')
-	}
-})
+
+
+
