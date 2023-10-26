@@ -183,7 +183,7 @@ body {
     align-items: center;
     gap: 10px;
     color: white;
-    cursor: pointer;
+    cursor: pointer; 
 }
 
 .user-chat:hover {
