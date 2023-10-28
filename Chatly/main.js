@@ -1,11 +1,13 @@
 import './style.css'
+import { v4 as uuid } from 'uuid'
 import { app, auth, storage, db } from './firebase-config.js'
 import { createUserWithEmailAndPassword, updateProfile, onAuthStateChanged, signInWithEmailAndPassword } from 'firebase/auth'
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
-import { doc, setDoc, getDocs, getDoc, updateDoc, collection, query, where, serverTimestamp, onSnapshot } from 'firebase/firestore'
+import { doc, setDoc, getDocs, getDoc, updateDoc, collection, query, where, serverTimestamp, onSnapshot, arrayUnion } from 'firebase/firestore'
 
 const content = document.getElementById('content')
 let user = ''
+let selectedUser = ''
 
 let setError = (parentElement, id) => {
 	if (parentElement.querySelector(`#${id}`)) {
@@ -26,8 +28,6 @@ let loadHTML = (url, callback) => {
 	if (xhr.readyState === 4 && xhr.status === 200) {
 		callback(xhr.responseText)
 		window.history.pushState(null, '', url == 'home.html' ? '/' : url.slice(0, -5))
-
-
 	}
   }
   xhr.send()
@@ -39,19 +39,52 @@ let updateUserStatus = new Promise(resolve => {
 	})
 })
 
-let getHomePageContents = (content, html) => {
-	if (auth.currentUser == null) {
-		return html
-	} 
-	
-	else {
+let getCombinedId = (userId) => {
+	return auth.currentUser.uid > userId 
+		? auth.currentUser.uid + userId 
+		: userId + auth.currentUser.uid
+}
+
+let getHomePageContents = async (content, html) => {
+	if (auth.currentUser !== null) {
 		content.innerHTML = html
+		
 		content.querySelector('.user').innerHTML = `
 			<img src="${auth.currentUser.photoURL}" alt="">
 			<span>${auth.currentUser.displayName}</span>
 			<button id="logout">Logout</button>
 		`
+		
+		
+		// Get documents (https://firebase.google.com/docs/firestore/query-data/get-data#web-modular-api_2)
+		let userChats = await getDoc(doc(db, 'userChats', auth.currentUser.uid))
+
+		if (userChats.exists()) { // Load users
+			Object.entries(userChats.data()).sort((a, b) => b[1].date - a[1].date).forEach(chat => {
+				let userChatDiv = document.createElement('div')
+				userChatDiv.className = 'user-chat'
+				userChatDiv.setAttribute('key', chat[1].userInfo.uid)
+				
+				userChatDiv.innerHTML = `
+					<img src=${chat[1].userInfo.photoURL} alt="">
+					<div class="user-chat-info">
+						<span>${chat[1].userInfo.displayName}</span>
+						<p>${chat[1].lastMessage?.text ? chat[1].lastMessage?.text : ''}</p>
+					</div>
+				`
+				content.querySelector('.chats').appendChild(userChatDiv) 
+			})
+		} else {
+			console.log("No such document!")
+		}
+
+		
+
 		return content.innerHTML
+	} 
+	
+	else {
+		return html
 	}
 }
 
@@ -62,22 +95,23 @@ let updateContent = (route) => {
 		updateUserStatus.then(() => {			
 			switch (route) {
 				case '/':
-					loadHTML(`${(auth.currentUser !==  null) ? 'home' : 'register'}.html`, (html) => {
-						content.innerHTML = getHomePageContents(content, html)
+					loadHTML(`${(auth.currentUser !==  null) ? 'home' : 'register'}.html`, async (html) => {
+						content.innerHTML = await getHomePageContents(content, html)
 						resolve()
 					})
+					
 					break
 	
 				case '/login':
-					loadHTML(`${(auth.currentUser !==  null) ? 'home' : 'login'}.html`, (html) => {
-						content.innerHTML = getHomePageContents(content, html)
+					loadHTML(`${(auth.currentUser !==  null) ? 'home' : 'login'}.html`, async (html) => {
+						content.innerHTML = await getHomePageContents(content, html)
 						resolve()
 					})
 					break
 	
 				case '/register':
-					loadHTML(`${(auth.currentUser !==  null) ? 'home' : 'register'}.html`, (html) => {
-						content.innerHTML = getHomePageContents(content, html)
+					loadHTML(`${(auth.currentUser !==  null) ? 'home' : 'register'}.html`, async (html) => {
+						content.innerHTML = await getHomePageContents(content, html)
 						resolve()
 					})
 					break
@@ -94,7 +128,9 @@ let updateContent = (route) => {
 let handleNavigation = () => {
 	return new Promise(async resolve => {
 		const route = window.location.pathname
+		
 		await updateContent(route)
+		
 		resolve()
 	})
 }	
@@ -102,12 +138,39 @@ let handleNavigation = () => {
 // Add event listeners
 window.addEventListener('popstate', handleNavigation)
 
+
 ;(async () => {
 	// Initial page load
 	await handleNavigation()
 
-
+	
 	if (window.location.pathname == '/') {
+
+		const unsubscribeFromLastMessage = onSnapshot(collection(db, 'userChats'), (snapshot) => {
+			// Loop through all contents and change them accordingly
+			snapshot.forEach(doc => {
+				const data = Object.entries(doc.data())[0]
+
+				if (data[1].userInfo.uid === auth.currentUser.uid) {
+					console.log('user1')
+					return
+
+				} else {
+					const combinedId = data[0]
+					const lastMessage = data[1].lastMessage.text
+
+					console.log(data)
+	
+					document.querySelector(`[key="${combinedId}"] p`).innerHTML = lastMessage // Updates the latest message (<p> tag) through doc.data()
+
+				}
+
+			})
+		})
+	
+		
+
+		const searchDiv = document.querySelector('.search')
 
 
 		document.getElementById('logout').addEventListener('click', (e) => {
@@ -122,6 +185,7 @@ window.addEventListener('popstate', handleNavigation)
 		document.getElementById('search-input').addEventListener('keydown', async (e) => {
 			if (e.code === 'Enter') {
 				e.preventDefault()
+				
 
 				const q = query(collection(db, 'users'), where('displayName', '==', e.target.value))
 
@@ -129,16 +193,25 @@ window.addEventListener('popstate', handleNavigation)
 			
 				try { // If a user is found
 					querySnapshot.forEach((doc) => {
-						user = doc.data() // make doc.data() a variable that can be used in getHomePageContents()
-						// update the html here
+						user = doc.data()
 
-						document.querySelector('.search .user-chat').innerHTML = `
+						let userChatDiv = document.createElement('div')
+						userChatDiv.className = 'user-chat'
+						userChatDiv.setAttribute('key', user.uid)
+						userChatDiv.innerHTML = `
 							<img src=${user.photoURL} alt="">
 							<div class="user-chat-info">
 								<span>${user.displayName}</span>
 								<p></p>
 							</div>
 						`
+						if (document.querySelector('.search .user-chat')) {
+							// Change contents of user-chat
+							document.querySelector('.search .user-chat').remove()
+							document.querySelector('.search').appendChild(userChatDiv)
+						} else {
+							document.querySelector('.search').appendChild(userChatDiv)
+						}
 					})
 				} catch (error) { // If a user is not found
 					console.log(error)
@@ -146,67 +219,151 @@ window.addEventListener('popstate', handleNavigation)
 			}
 		})
 
-		document.querySelector('.search .user-chat').addEventListener('click', async (e) => {
-			// Check whether the group (chat collection in firestore) exists, if not create a new a one
-
-			const combinedId = auth.currentUser.uid > user.uid 
-				? auth.currentUser.uid + user.uid 
-				: user.uid + auth.currentUser.uid
-
-
-			try {
-				const res = await getDoc(doc(db, 'chats', combinedId))
-
-				if (!res.exists()) {
-					// Create chat in chats collection
-					await setDoc(doc(db, 'chats', combinedId), {messages: []})
-
-					// Create user chats
-					await updateDoc(doc(db, 'userChats', auth.currentUser.uid), {
-						[combinedId + '.userInfo']: {
-							uid: user.uid,
-							displayName: user.displayName,
-							photoURL: user.photoURL
-						},
-						[combinedId + '.date']: serverTimestamp()
-					})
-
-					await updateDoc(doc(db, 'userChats', user.uid), {
-						[combinedId + '.userInfo']: {
-							uid: auth.currentUser.uid,
-							displayName: auth.currentUser.displayName,
-							photoURL: auth.currentUser.photoURL
-						},
-						[combinedId + '.date']: serverTimestamp()
-					})
+		searchDiv.addEventListener('click', async (e) => {
+			
+			if (e.target.closest('.search .user-chat')) {
+				// Check whether the group (chat collection in firestore) exists, if not create a new a one
+				const combinedId = getCombinedId(user.uid)
+	
+	
+				try {
+	
+					const res = await getDoc(doc(db, 'chats', combinedId))
+	
+					if (!res.exists()) {
+						// Create chat in chats collection
+						await setDoc(doc(db, 'chats', combinedId), {messages: []})
+	
+						// Create user chats
+						await updateDoc(doc(db, 'userChats', auth.currentUser.uid), {
+							[combinedId + '.userInfo']: {
+								uid: user.uid,
+								displayName: user.displayName,
+								photoURL: user.photoURL
+							},
+							[combinedId + '.date']: serverTimestamp()
+						})
+	
+						await updateDoc(doc(db, 'userChats', user.uid), {
+							[combinedId + '.userInfo']: {
+								uid: auth.currentUser.uid,
+								displayName: auth.currentUser.displayName,
+								photoURL: auth.currentUser.photoURL
+							},
+							[combinedId + '.date']: serverTimestamp()
+						})
+					}
+				} catch (error) {
+					console.log(error)
+				} 
+	
+				finally {
+					document.querySelector('.chats').appendChild(document.querySelector('.search .user-chat')) // Move .user-chat search div to the .chats sidebar (friends list)
+					document.getElementById('search-input').value = '' // Clear input text	
 				}
-			} catch (error) {
-				console.log(error)
-			} 
 
-			finally {
-				document.querySelector('.chats').appendChild(document.querySelector('.search .user-chat'))
-				document.getElementById('search-input').value = ''
+				
+				
+				// const unsub = onSnapshot(doc(db, 'userChats', auth.currentUser.uid), (doc) => {
 
-				let userChatsDiv = document.createElement('div')
-				userChatsDiv.className = 'user-chat'
-				document.querySelector('.search').appendChild(userChatsDiv)
+				// 	Object.entries(doc.data()).forEach((chat) => {
 
+				// 		document.querySelector('.chats .user-chat').setAttribute('key', chat[0].uid) // not right one 
+				// 		console.log()
+				// 	})
+				// })
 			}
 		})
 
-		const unsub = onSnapshot(doc(db, 'userChats', auth.currentUser.uid), (doc) => {
+		document.querySelector('.chats').addEventListener('click', async (e) => {
+			
+			let userChatsData = Object.entries((await getDoc(doc(db, 'userChats', auth.currentUser.uid))).data())
 
-			Object.entries(doc.data()).forEach((chat) => {
-				// TODO: LOOP THROUGH EACH ONE AND ADD EACH COMPONENTS TO THE CHAT SIDEBAR.
-				document.querySelector('.search .user-chat').id = chat[0]
-				console.log(document)
+			userChatsData.sort((a, b) => b[1].date - a[1].date).forEach(chat => {
+				if (e.target.closest(`[key="${chat[1].userInfo.uid}"]`)) {
+					// If user has clicked on one of their users from their friends list
+					selectedUser = chat[1]
+					
+
+					document.querySelector('.chat-info span').innerHTML = selectedUser.userInfo.displayName
+
+					const unsubscribeFromChatMessages = onSnapshot(doc(db, 'chats', getCombinedId(selectedUser.userInfo.uid)), (doc) => {
+						document.querySelector('.messages').innerHTML = '' // Clear all messages
+
+						// Update HTML for chat messages
+						
+						doc.data().messages.forEach(message => {
+							document.querySelector('.messages').innerHTML += `
+							<div class="message ${message.senderId === auth.currentUser.uid && 'owner'}">
+								<div class="message-info">
+									<img src="${message.senderId === auth.currentUser.uid ? auth.currentUser.photoURL : selectedUser.userInfo.photoURL}" alt="">
+									<span>just now</span>
+								</div>
+								<div class="message-content">
+									<p>${message.text}</p>
+									${message.image && `<img src="` + message.image + `" alt="">`}
+								</div>
+							</div>
+							`
+						})
+					
+					})
+					
+				}
 			})
+
+
+			 
 		})
+
+		document.querySelector('.send button').addEventListener('click', async (e) => {
+			const textInput = document.querySelector('.chat-input input[type="text"]')
+			const file = document.querySelector('.send input[type="file"]')
+			const combinedId = getCombinedId(selectedUser.userInfo.uid)
+
+			// Upload user input to the chat collection in Firestore
+			const storageRef = ref(storage, uuid())
+			const uploadTask = uploadBytesResumable(storageRef, file.files[0])
+			uploadTask.on('state_changed',	
+					() => {
+						getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
+							await updateDoc(doc(db, 'chats', combinedId), {
+								messages: arrayUnion({
+									id: uuid(),
+									text: textInput.value,
+									senderId: auth.currentUser.uid,
+									date: Date.now(),
+									image: downloadURL
+								})
+							})
+						}).catch(error => {
+							console.error(error)
+						})						
+					},
+					(error) => {
+						console.log('Upload error:', error)
+					}
+				)
+
+			await updateDoc(doc(db, 'userChats', auth.currentUser.uid), {
+				[combinedId + '.lastMessage']: {
+					text: textInput.value,
+				},
+				[combinedId + '.date']: serverTimestamp()
+			})
+
+			await updateDoc(doc(db, 'userChats', selectedUser.userInfo.uid), {
+				[combinedId + '.lastMessage']: {
+					text: textInput.value,
+				},
+				[combinedId + '.date']: serverTimestamp()
+				})
+
+		})
+
 		
-
+		
 	}
-
 
 
 	
