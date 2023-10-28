@@ -24,3 +24,4 @@ dist-ssr
 *.sw?
 Chatly.code-workspace
 
+Chatly/firebase-config.js
