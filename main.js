@@ -27,6 +27,7 @@ let loadHTML = (url, callback) => {
   xhr.onreadystatechange = () => {
 	if (xhr.readyState === 4 && xhr.status === 200) {
 		callback(xhr.responseText)
+		console.log(xhr.responseText)
 		window.history.pushState(null, '', url == 'home.html' ? '/' : url.slice(0, -5))
 	}
   }
@@ -55,7 +56,7 @@ let extractFromString = (inputString, searchTerm) => {
 }
 
 let getHomePageContents = async (content, html) => {
-	if (auth.currentUser !== null) {
+	if (auth.currentUser !== null) { // If user is authenticated and logged in
 		content.innerHTML = html
 		
 		content.querySelector('.user').innerHTML = `
@@ -101,6 +102,8 @@ let getHomePageContents = async (content, html) => {
 let updateContent = (route) => {
 	return new Promise(async (resolve, reject) => {
 		content.innerHTML = ''
+		// the content is the div that has nothing inside of it
+		// then this following code is supposed to load the register contents
 		updateUserStatus.then(() => {			
 			switch (route) {
 				case '/':
@@ -133,6 +136,8 @@ let updateContent = (route) => {
 		})
 	})
 }
+
+// 
 
 let handleNavigation = () => {
 	return new Promise(async resolve => {
@@ -395,6 +400,7 @@ window.addEventListener('popstate', handleNavigation)
 	
 	else if (window.location.pathname == '/register') {
 		let registerForm = document.getElementById('register-form')
+		console.assert(!registerForm)
 	
 		registerForm.addEventListener("submit", async (e) => {
 			e.preventDefault(e)
